@@ -1,3 +1,7 @@
 dash
 plotly
 websockets
+pandas
+scikit-learn
+xgboost
+joblib
