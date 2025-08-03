@@ -5,7 +5,7 @@ from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier
 
 # Load pre-engineered features from CSV
-df = pd.read_csv("Users/quddusbello/PycharmProjects/real-time-order-book/data_stream/lob_features.csv")
+df = pd.read_csv("/Users/quddusbello/PycharmProjects/real-time-order-book/data_stream/lob_features.csv")
 
 # Split into features (X) and target label (y)
 X = df.drop("label", axis=1)
