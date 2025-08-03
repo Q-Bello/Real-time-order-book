@@ -1,4 +1,4 @@
-# 📈 Real-Time Order Book Visualiser & Market Microstructure Analyser
+# Real-Time Order Book Visualiser & Market Microstructure Analyser
 
 This project is a Python-based real-time visualisation and modelling tool for analysing order book microstructure from high-frequency market data. It captures, processes, and models Level 2 (depth-of-market) data using WebSockets and machine learning.
 
@@ -47,14 +47,14 @@ Performance metrics such as accuracy and F1-score are printed to console after t
 
 ---
 
-## 🛠 Setup Instructions
+##  Setup Instructions
 
 ```bash
 # Clone the repo
 git clone https://github.com/Q-Bello/real-time-order-book.git
 cd real-time-order-book
 
-# Create virtual environment (recommended)
+# Create virtual environment
 python3 -m venv .venv
 source .venv/bin/activate
 
@@ -77,13 +77,13 @@ bash
 python visualiser/app.py
 This will start a local server at http://127.0.0.1:8050/ showing real-time order book dynamics.
 
-Notes
+#Notes
 The current dataset was collected during live trading hours using the Binance WebSocket.
 
 Label imbalance may require resampling or data augmentation in future iterations.
 
 The visualiser supports basic price depth and bid/ask spread rendering.
-
-Author
-Quddus Bello
-BSc Computer Science @ Newcastle University (2024–2027)
+```
+## Author
+- Quddus Bello, BSc Computer Science @ Newcastle University (2024–2027)
+- LinkedIn: https://www.linkedin.com/in/quddus-bello-73482b317/
