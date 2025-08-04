@@ -43,3 +43,10 @@ print("\nXGBoost:")
 print("Accuracy:", accuracy_score(y_test, xgb_preds))
 print("F1 Score:", f1_score(y_test, xgb_preds, average="macro"))
 print("Confusion Matrix:\n", confusion_matrix(y_test, xgb_preds))
+
+import joblib
+import os
+
+os.makedirs("model", exist_ok=True)
+joblib.dump(xgb_model, "model/xgboost_model.pkl")
+print("✅ XGBoost model saved to model/xgboost_model.pkl")
