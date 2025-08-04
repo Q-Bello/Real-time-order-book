@@ -15,17 +15,13 @@ def calculate_spread(bids, asks):
     return best_ask - best_bid
 
 def calculate_ofi(current_bids, current_asks, prev_bids, prev_asks):
-    ofi = 0.0
+    best_bid = max(current_bids.keys(), default=0)
+    best_ask = min(current_asks.keys(), default=float("inf"))
 
-    all_prices = set(list(current_bids.keys()) + list(prev_bids.keys()))
-    for price in all_prices:
-        current_qty = current_bids.get(price, 0)
-        prev_qty = prev_bids.get(price, 0)
-        if price >= max(current_bids.keys()):
-            ofi += current_qty - prev_qty
-        else:
-            ofi -= current_qty - prev_qty
-    return ofi
+    bid_change = current_bids.get(best_bid, 0) - prev_bids.get(best_bid, 0)
+    ask_change = prev_asks.get(best_ask, 0) - current_asks.get(best_ask, 0)
+
+    return bid_change + ask_change
 
 if __name__ == "__main__":
     prev_bids = {100.0: 1.5, 99.5: 2.0}
