@@ -1,52 +1,76 @@
+# This script loads the dataset created by generate_dataset.py.
+# It trains an XGBoost classifier and automatically configures it for binary or
+# multi-class classification based on the labels found in the data.
+# The trained model is saved to a .pkl file for later use.
+
 import pandas as pd
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
+from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier
+import joblib
+import os
+import numpy as np
 
-# Load pre-engineered features from CSV
-df = pd.read_csv("/Users/quddusbello/PycharmProjects/real-time-order-book/data_stream/lob_features.csv")
+script_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(script_dir)
+csv_path = os.path.join(project_root, 'data_stream', 'lob_features.csv')
+model_path = os.path.join(script_dir, 'xgboost_model.pkl')
 
-# Split into features (X) and target label (y)
+try:
+    df = pd.read_csv(csv_path)
+    print(f"Dataset loaded successfully from {csv_path}")
+except FileNotFoundError:
+    print(f"ERROR: {csv_path} not found. Please run `data_stream/generate_dataset.py` first.")
+    exit(1)
+
 X = df.drop("label", axis=1)
 y = df["label"]
 
-# Check class balance and exit early if model can't train
 label_counts = y.value_counts()
-print("Class distribution:\n", label_counts)
-
+print("\nClass distribution:\n", label_counts)
 if len(label_counts) < 2:
-    print("🚫 ERROR: Dataset contains only one class — cannot train model.")
+    print("ERROR: Dataset contains only one class — cannot train model.")
     exit(1)
 
-# Split into training and testing sets (80/20)
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42, stratify=y
 )
 
-# Logistic Regression baseline model
-log_model = LogisticRegression(class_weight="balanced", max_iter=1000)
-log_model.fit(X_train, y_train)
-log_preds = log_model.predict(X_test)
+print("\n--- Training XGBoost Model ---")
 
-print("\nLogistic Regression:")
-print("Accuracy:", accuracy_score(y_test, log_preds))
-print("F1 Score:", f1_score(y_test, log_preds, average="macro"))
-print("Confusion Matrix:\n", confusion_matrix(y_test, log_preds))
+num_classes = y.nunique()
+print(f"Found {num_classes} unique classes for the model.")
 
-# XGBoost model with class balancing
-xgb_model = XGBClassifier(use_label_encoder=False, eval_metric="logloss")
+if num_classes == 2:
+    print("Configuring model for BINARY classification.")
+    xgb_model = XGBClassifier(
+        objective='binary:logistic',
+        use_label_encoder=False,
+        eval_metric="logloss",
+        random_state=42
+    )
+else:
+    print("Configuring model for MULTI-CLASS classification.")
+    xgb_model = XGBClassifier(
+        objective='multi:softprob',
+        num_class=num_classes,
+        use_label_encoder=False,
+        eval_metric="mlogloss",
+        random_state=42
+    )
+
 xgb_model.fit(X_train, y_train)
 xgb_preds = xgb_model.predict(X_test)
 
-print("\nXGBoost:")
-print("Accuracy:", accuracy_score(y_test, xgb_preds))
-print("F1 Score:", f1_score(y_test, xgb_preds, average="macro"))
-print("Confusion Matrix:\n", confusion_matrix(y_test, xgb_preds))
+print("\nXGBoost Results:")
 
-import joblib
-import os
+full_label_map = { 0: 'STABLE (0)', 1: 'DOWN (1)', 2: 'UP (2)' }
+unique_labels_in_data = np.sort(y.unique())
+target_names = [full_label_map[label] for label in unique_labels_in_data]
+print(f"\nReport will be generated for these classes: {target_names}")
 
-os.makedirs("model", exist_ok=True)
-joblib.dump(xgb_model, "model/xgboost_model.pkl")
-print("✅ XGBoost model saved to model/xgboost_model.pkl")
+print(classification_report(y_test, xgb_preds, target_names=target_names))
+print("\nConfusion Matrix:\n", confusion_matrix(y_test, xgb_preds))
+
+joblib.dump(xgb_model, model_path)
+print(f"\nXGBoost model saved to {model_path}")
