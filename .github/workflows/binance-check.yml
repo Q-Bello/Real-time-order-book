@@ -1,0 +1,31 @@
+name: Binance connectivity check
+on:
+  push:
+    branches: [ci/binance-check]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: REST endpoints
+        run: |
+          for u in "https://api.binance.com/api/v3/depth?symbol=BTCUSDT&limit=5" "https://data-api.binance.vision/api/v3/depth?symbol=BTCUSDT&limit=5"; do
+            echo "== $u"; curl -s -o /tmp/out -w "HTTP %{http_code}\n" "$u"; head -c 200 /tmp/out; echo
+          done
+      - name: WebSocket endpoints
+        run: |
+          pip install -q websockets
+          python - <<'PY'
+          import asyncio, websockets
+          async def probe(url):
+              try:
+                  async with websockets.connect(url, open_timeout=10) as ws:
+                      msg = await asyncio.wait_for(ws.recv(), 10)
+                      print("OK", url, msg[:120])
+              except Exception as e:
+                  print("FAIL", url, type(e).__name__, e)
+          async def main():
+              for u in ["wss://stream.binance.com:9443/stream?streams=btcusdt@depth@100ms/btcusdt@aggTrade",
+                        "wss://data-stream.binance.vision/stream?streams=btcusdt@depth@100ms/btcusdt@aggTrade"]:
+                  await probe(u)
+          asyncio.run(main())
+          PY
