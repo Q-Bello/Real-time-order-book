@@ -1,13 +1,16 @@
 """Project-wide settings. Paths are relative to the directory the commands are run from."""
 
+import os
 from pathlib import Path
 
 SYMBOL = "btcusdt"
 TICK_SIZE = 0.01  # BTCUSDT price increment
 
 # Binance combined stream: 100ms book diffs plus aggregated trades on one connection.
-WS_URL = "wss://stream.binance.com:9443/stream?streams={s}@depth@100ms/{s}@aggTrade"
-SNAPSHOT_URL = "https://api.binance.com/api/v3/depth?symbol={S}&limit=1000"
+# Binance also publishes the same public market data on data-stream.binance.vision and
+# data-api.binance.vision; set these environment variables to use those instead.
+WS_URL = os.environ.get("LOBPRED_WS_URL", "wss://stream.binance.com:9443/stream?streams={s}@depth@100ms/{s}@aggTrade")
+SNAPSHOT_URL = os.environ.get("LOBPRED_SNAPSHOT_URL", "https://api.binance.com/api/v3/depth?symbol={S}&limit=1000")
 
 # Prediction horizons in seconds.
 HORIZONS_S = (1, 2, 5, 10, 30)
