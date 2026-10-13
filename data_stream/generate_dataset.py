@@ -1,91 +1,74 @@
-# This script connects to the Binance WebSocket to collect live market data.
-# It uses the FeatureExtractor to process this data and saves a labelled dataset (CSV)
-# which is then used to train the machine learning model.
+# Collects live BTC/USDT order book data from Binance, computes features and labels,
+# and saves a training dataset to data_stream/lob_features.csv.
+#
+# Rows are written to disk in batches, so stopping early with Ctrl+C keeps everything
+# collected so far. At Binance's 100ms update rate, 20,000 rows takes roughly 35-40 minutes.
+#
+# Usage (from the project root):
+#   python -m data_stream.generate_dataset --rows 20000
 
+import argparse
 import asyncio
-import websockets
-import json
-import sys
 import os
+import sys
+
 import pandas as pd
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.order_book_cache import OrderBook
+from utils.binance_feed import synced_order_book
 from microstructure.data_labeller import FeatureExtractor
 
+DEFAULT_OUTPUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lob_features.csv")
+SAVE_EVERY = 500
 
-async def collect_data():
-    # Initialise the objects that will manage the data.
+
+async def collect_data(target_rows, window, output, append):
     order_book = OrderBook(depth=20)
-    extractor = FeatureExtractor(window=30)
+    extractor = FeatureExtractor(window=window)
+    if os.path.exists(output) and not append:
+        os.remove(output)
 
-    # Define how many data points to collect.
-    DATASET_TARGET_SIZE = 200
-    BUFFER_SIZE = extractor.window + 1
-
-    uri = "wss://stream.binance.com:9443/ws/btcusdt@depth@100ms"
-
-    print(f"Connecting to WebSocket at {uri}...")
-    async with websockets.connect(uri) as ws:
-        print("Successfully connected.")
-        print(f"Waiting for {BUFFER_SIZE} data points to fill the initial buffer...")
-
-        rows_collected = 0
-        messages_received = 0
-
-        # Loop until the target number of rows is collected.
-        while rows_collected < DATASET_TARGET_SIZE:
-            try:
-                # Wait for a new message from the WebSocket.
-                msg = await ws.recv()
-                data = json.loads(msg)
-                messages_received += 1
-
-                # Update the local order book and extract features.
-                order_book.update(data)
-                current_bids, current_asks = order_book.bids, order_book.asks
-                row = extractor.update(current_bids, current_asks)
-
-                # The extractor returns a row only after its buffer is full.
-                if row:
-                    rows_collected += 1
-                    # Print progress on a single line.
-                    sys.stdout.write(f"\rCollected row {rows_collected}/{DATASET_TARGET_SIZE}...")
-                    sys.stdout.flush()
-                else:
-                    # Show buffering progress.
-                    sys.stdout.write(f"\rBuffering... [Received: {messages_received}, Need: {BUFFER_SIZE}]")
-                    sys.stdout.flush()
-            except Exception as e:
-                print(f"\nError during collection: {e}")
+    rows_collected = 0
+    print("Connecting to Binance and syncing the order book...")
+    try:
+        async for event_time, resynced in synced_order_book(order_book):
+            if resynced:
+                extractor.reset()
+            row = extractor.update(order_book.bids, order_book.asks, timestamp=event_time)
+            if row is None:
+                continue
+            rows_collected += 1
+            if rows_collected % SAVE_EVERY == 0:
+                extractor.save_to_csv(output, append=True)
+            sys.stdout.write(f"\rCollected {rows_collected}/{target_rows} rows")
+            sys.stdout.flush()
+            if rows_collected >= target_rows:
                 break
+    finally:
+        extractor.save_to_csv(output, append=True)
 
-    print(f"\n\nFinished collecting {len(extractor.feature_rows)} data points.")
+    print(f"\n\nSaved to {output}")
+    df = pd.read_csv(output)
+    print(f"Total rows in file: {len(df)}")
+    print("Class distribution:")
+    print(df["label"].value_counts(normalize=True).rename({0: "STABLE", 1: "DOWN", 2: "UP"}).round(3))
+    if "horizon_ms" in df:
+        print(f"Median label horizon: {df['horizon_ms'].median() / 1000:.1f} seconds")
 
-    # Save the data if any was collected.
-    if extractor.feature_rows:
-        # Build a robust file path to save the CSV in the correct directory.
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        filename = "lob_features.csv"
-        output_filename = os.path.join(script_dir, filename)
 
-        extractor.save_to_csv(output_filename)
-        print(f"Saved data to {output_filename}")
-
-        # Final check to ensure the dataset is balanced enough for training.
-        df = pd.read_csv(output_filename)
-        label_counts = df['label'].value_counts()
-        print("\nNew dataset class distribution:")
-        print(label_counts)
-        if len(label_counts) < 2:
-            print("\nWARNING: The new dataset still contains only one class.")
-            print("The market might be very stable. Try running again later.")
-        else:
-            print("\nDataset contains multiple classes. Ready for training.")
-    else:
-        print("No data was collected, file not saved.")
+def main():
+    parser = argparse.ArgumentParser(description="Collect a labelled order book dataset.")
+    parser.add_argument("--rows", type=int, default=20000, help="Number of labelled rows to collect")
+    parser.add_argument("--window", type=int, default=30, help="Label horizon in book updates")
+    parser.add_argument("--output", default=DEFAULT_OUTPUT)
+    parser.add_argument("--append", action="store_true", help="Add to an existing dataset")
+    args = parser.parse_args()
+    try:
+        asyncio.run(collect_data(args.rows, args.window, args.output, args.append))
+    except KeyboardInterrupt:
+        print("\nStopped early. Rows collected so far have been saved.")
 
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(collect_data())
-    except KeyboardInterrupt:
-        print("\n\nData collection interrupted by user.")
+    main()

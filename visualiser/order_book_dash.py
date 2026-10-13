@@ -4,51 +4,38 @@
 # thread runs the web server, updating the UI every second with the latest data.
 
 import asyncio
-import json
+import os
+import sys
 import threading
-import websockets
-import dash
-from dash import dcc, html
-from dash.dependencies import Input, Output
-import plotly.graph_objs as go
 from collections import deque
-import joblib
+
+import dash
+import dash_bootstrap_components as dbc
 import numpy as np
 import pandas as pd
-import os
-import dash_bootstrap_components as dbc
+import plotly.graph_objs as go
+from dash import dcc, html
+from dash.dependencies import Input, Output
 
 # --- 1. Setup and Initialization ---
-# Build robust file paths.
 script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(script_dir)
-model_path = os.path.join(project_root, 'model', 'xgboost_model.pkl')
-csv_path = os.path.join(project_root, 'data_stream', 'lob_features.csv')
-
-# Load the trained model and the feature order from the CSV.
-try:
-    xgb_model = joblib.load(model_path)
-    df = pd.read_csv(csv_path)
-    FEATURE_ORDER = df.drop('label', axis=1).columns.tolist()
-    print("Model and feature order loaded successfully.")
-except FileNotFoundError as e:
-    print(f"ERROR: Could not load necessary files. {e}")
-    print("Please run `generate_dataset.py` and `train_model.py` first.")
-    exit(1)
-
-# Add the project root to the system path to allow importing our own modules.
-import sys
-
 sys.path.insert(0, project_root)
 from utils.order_book_cache import OrderBook
+from utils.binance_feed import synced_order_book
 from microstructure.data_labeller import FeatureExtractor
+from model.predictor import Predictor
 
-# Map numeric labels to display text and colours.
-LABEL_MAP = {
-    0: ("STABLE", "secondary"),
-    1: ("DOWN", "danger"),
-    2: ("UP", "success")
-}
+try:
+    predictor = Predictor()
+    print("Model loaded successfully.")
+except FileNotFoundError as e:
+    print(f"ERROR: Could not load the trained model. {e}")
+    print("Please run `python -m data_stream.generate_dataset` and `python -m model.train_model` first.")
+    exit(1)
+
+# Map prediction labels to display colours.
+LABEL_COLOURS = {"STABLE": "secondary", "DOWN": "danger", "UP": "success"}
 
 
 # This class holds the shared state between the WebSocket thread and the Dash app.
@@ -68,45 +55,36 @@ app_state = AppState()
 
 
 # --- 2. Background Data Collector ---
-# This function runs in a separate thread to avoid blocking the web server.
+# Runs in a separate thread so it does not block the web server.
 def websocket_runner():
     async def data_collector():
-        uri = "wss://stream.binance.com:9443/ws/btcusdt@depth@100ms"
-        async with websockets.connect(uri) as ws:
-            print("WebSocket connected. Streaming data...")
-            while True:
-                msg = await ws.recv()
-                data = json.loads(msg)
-                # Use a lock to safely update the shared state.
-                with app_state.lock:
-                    app_state.order_book.update(data)
-                    bids, asks = app_state.order_book.bids, app_state.order_book.asks
-                    row = app_state.feature_extractor.update(bids, asks)
-                    # If the extractor produced a valid row of features...
-                    if row:
-                        # Store the latest data for the dashboard to display.
-                        app_state.latest_metrics = {
-                            "Spread": f"{row.get('spread', 0):.4f}",
-                            "OFI": f"{row.get('ofi', 0):.2f}",
-                            "VOI": f"{row.get('voi', 0):.2f}"
-                        }
-                        app_state.timestamps.append(pd.Timestamp.now())
-                        app_state.mid_prices.append(row.get('mid_price'))
-                        app_state.wmp_prices.append(row.get('weighted_mid_price'))
-                        # Make a prediction with the trained model.
-                        try:
-                            features = np.array([[row[feature] for feature in FEATURE_ORDER]])
-                            pred = xgb_model.predict(features)[0]
-                            proba = xgb_model.predict_proba(features)[0]
-
-                            label_text, color = LABEL_MAP.get(pred, ("N/A", "secondary"))
-                            app_state.latest_prediction = {
-                                "label_text": label_text,
-                                "color": color,
-                                "confidence": f"{proba[pred]:.2%}"
-                            }
-                        except Exception as e:
-                            print(f"Prediction error: {e}")
+        print("Syncing order book and streaming data...")
+        async for event_time, resynced in synced_order_book(app_state.order_book):
+            # Use a lock to safely update the shared state.
+            with app_state.lock:
+                if resynced:
+                    app_state.feature_extractor.reset()
+                book = app_state.order_book
+                row = app_state.feature_extractor.compute_features(book.bids, book.asks, timestamp=event_time)
+                if row is None:
+                    continue
+                app_state.latest_metrics = {
+                    "Spread": f"{row['spread']:.4f}",
+                    "OFI": f"{row['ofi']:.2f}",
+                    "VOI": f"{row['voi']:.2f}",
+                }
+                app_state.timestamps.append(pd.Timestamp(event_time, unit="ms"))
+                app_state.mid_prices.append(row["mid_price"])
+                app_state.wmp_prices.append(row["weighted_mid_price"])
+                try:
+                    label, confidence = predictor.predict(row)
+                    app_state.latest_prediction = {
+                        "label_text": label,
+                        "color": LABEL_COLOURS.get(label, "secondary"),
+                        "confidence": f"{confidence:.2%}",
+                    }
+                except Exception as e:
+                    print(f"Prediction error: {e}")
 
     asyncio.run(data_collector())
 

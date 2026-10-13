@@ -1,11 +1,18 @@
-# This is the core of the data pipeline.
-# It takes live order book data, calculates all features, and creates a label.
-# The labelling is dynamic, based on whether the future price moves more than a fraction
-# of the current bid-ask spread, making it adaptive to market volatility.
+# Turns a stream of order book states into model features and labels.
+#
+# Features are computed from the book at time t. The label for that row describes
+# what the mid-price does over the NEXT `window` updates (t+1 ... t+window), so a
+# row can only be emitted once those future updates have arrived. Features and
+# label therefore always refer to the same moment, with no look-ahead.
+#
+# Label: compare the average future mid-price with the mid-price at t, using a
+# threshold of half the spread at t, so the definition adapts to market conditions.
+#   0 = STABLE, 1 = DOWN, 2 = UP
 
 import csv
-from collections import deque
 import os
+from collections import deque
+
 import numpy as np
 
 from microstructure.feature_engineering import (
@@ -13,98 +20,109 @@ from microstructure.feature_engineering import (
     calculate_spread,
     calculate_ofi,
     calculate_weighted_mid_price,
-    calculate_voi
+    calculate_voi,
 )
+
+# The only columns the model is trained on. Raw prices are deliberately excluded:
+# BTC's price level drifts over time, so a model can "learn" the level of the
+# training period rather than anything about order flow.
+FEATURE_COLUMNS = ["spread", "ofi", "voi", "microprice_offset"]
+LABEL_NAMES = {0: "STABLE", 1: "DOWN", 2: "UP"}
 
 
 class FeatureExtractor:
-    def __init__(self, depth=20, window=30):
-        self.depth = depth
-        # The forward-looking window (in number of messages) for creating labels.
+    def __init__(self, window=30, threshold_spreads=0.5):
+        # Forward-looking horizon for labels, in number of book updates.
         self.window = window
-        # Store the previous state of the book for calculating OFI and VOI.
+        self.threshold_spreads = threshold_spreads
         self.prev_bids = {}
         self.prev_asks = {}
-        # A deque to store the recent history of mid-prices for labelling.
-        self.mid_prices = deque(maxlen=window + 1)
-        # A list to accumulate rows of features and labels before saving.
+        # Rows waiting for their future window to arrive before they can be labelled.
+        self.pending = deque()
         self.feature_rows = []
 
-    def update(self, current_bids, current_asks):
-        # Do nothing if the order book is empty.
-        if not current_bids or not current_asks: return None
-        # On the first run, just store the state and wait for the next update.
+    def reset(self):
+        """Forget previous-book state, e.g. after the feed re-syncs."""
+        self.prev_bids = {}
+        self.prev_asks = {}
+        self.pending.clear()
+
+    def compute_features(self, current_bids, current_asks, timestamp=None):
+        """Features for the current book state (no label). Used for live prediction."""
+        if not current_bids or not current_asks:
+            return None
         if not self.prev_bids:
-            self.prev_bids = current_bids
-            self.prev_asks = current_asks
+            self.prev_bids, self.prev_asks = dict(current_bids), dict(current_asks)
             return None
 
-        # Sort bids and asks for accurate feature calculation.
         sorted_bids = sorted(current_bids.items(), key=lambda x: -x[0])
         sorted_asks = sorted(current_asks.items(), key=lambda x: x[0])
 
-        # Calculate all features for the current state.
         mid_price = calculate_mid_price(sorted_bids, sorted_asks)
         spread = calculate_spread(sorted_bids, sorted_asks)
-
-        # A valid spread is required for our dynamic threshold.
-        if mid_price is None or spread is None or spread == 0:
-            return None
-
         wmp = calculate_weighted_mid_price(sorted_bids, sorted_asks)
         ofi = calculate_ofi(current_bids, current_asks, self.prev_bids, self.prev_asks)
         voi = calculate_voi(current_bids, current_asks, self.prev_bids, self.prev_asks)
 
-        # Update previous state for the next iteration.
-        self.prev_bids = current_bids
-        self.prev_asks = current_asks
+        # Copy, because the order book dicts are mutated in place by the feed.
+        self.prev_bids, self.prev_asks = dict(current_bids), dict(current_asks)
 
-        if any(v is None for v in [wmp]): return None
+        if mid_price is None or spread is None or spread <= 0 or wmp is None:
+            return None
 
-        # Add the current mid-price to our historical deque.
-        self.mid_prices.append(mid_price)
-
-        # We need a full window of mid-prices to create a label.
-        if len(self.mid_prices) < self.window + 1: return None
-
-        # --- Dynamic Labelling Logic ---
-        # The price corresponding to our calculated features.
-        price_at_event = self.mid_prices[0]
-        # The prices that occurred *after* our event.
-        future_prices = list(self.mid_prices)[1:]
-        average_future_price = np.mean(future_prices)
-
-        # The threshold is a fraction of the spread, making it adaptive to volatility.
-        dynamic_threshold = spread * 0.5
-
-        # Default to STABLE (0).
-        label = 0
-        if average_future_price > price_at_event + dynamic_threshold:
-            label = 2  # UP
-        elif average_future_price < price_at_event - dynamic_threshold:
-            label = 1  # DOWN
-
-        # Assemble the final row with features and the calculated label.
-        row = {
-            "mid_price": price_at_event,
+        return {
+            "timestamp": timestamp,
+            "mid_price": mid_price,
             "weighted_mid_price": wmp,
             "spread": spread,
             "ofi": ofi,
             "voi": voi,
-            "label": label
+            # Where the volume-weighted price sits inside the spread: -0.5 (at the bid)
+            # to +0.5 (at the ask). Scale-free, unlike the raw weighted mid-price.
+            "microprice_offset": (wmp - mid_price) / spread,
         }
 
-        self.feature_rows.append(row)
-        return row
+    def update(self, current_bids, current_asks, timestamp=None):
+        """Feed one book state. Returns a labelled row once one is ready, else None."""
+        row = self.compute_features(current_bids, current_asks, timestamp)
+        if row is None:
+            return None
 
-    def save_to_csv(self, filename="orderbook_features.csv"):
-        if not self.feature_rows: return
-        # Ensure the directory exists before trying to save the file.
+        self.pending.append(row)
+        # Need the event itself plus `window` later updates.
+        if len(self.pending) < self.window + 1:
+            return None
+
+        event = self.pending.popleft()
+        future = list(self.pending)[: self.window]
+        average_future_price = np.mean([r["mid_price"] for r in future])
+        threshold = event["spread"] * self.threshold_spreads
+
+        label = 0
+        if average_future_price > event["mid_price"] + threshold:
+            label = 2
+        elif average_future_price < event["mid_price"] - threshold:
+            label = 1
+
+        labelled = dict(event)
+        labelled["label"] = label
+        if timestamp is not None and event["timestamp"] is not None:
+            # How far ahead this label actually looked, in milliseconds.
+            labelled["horizon_ms"] = future[-1]["timestamp"] - event["timestamp"]
+        self.feature_rows.append(labelled)
+        return labelled
+
+    def save_to_csv(self, filename="orderbook_features.csv", append=False):
+        """Write accumulated rows to CSV and clear them from memory."""
+        if not self.feature_rows:
+            return
         directory = os.path.dirname(filename)
-        os.makedirs(directory, exist_ok=True)
-        # Write the accumulated rows to the specified CSV file.
-        keys = self.feature_rows[0].keys()
-        with open(filename, "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=keys)
-            writer.writeheader()
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+        write_header = not (append and os.path.exists(filename))
+        with open(filename, "a" if append else "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=list(self.feature_rows[0].keys()))
+            if write_header:
+                writer.writeheader()
             writer.writerows(self.feature_rows)
+        self.feature_rows = []
