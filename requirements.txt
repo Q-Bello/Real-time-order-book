@@ -1,8 +1,2 @@
-dash
-plotly
-websockets
-pandas
-scikit-learn
-xgboost
-joblib
-dash-bootstrap-componentspytest
+# Installs the package plus the dashboard and development extras.
+-e .[dashboard,dev]
