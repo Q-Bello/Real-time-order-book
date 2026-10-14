@@ -85,7 +85,7 @@
         },
         "macro_f1": {
           "mean": 0.3197,
-          "std": 0.0115
+          "std": 0.0116
         },
         "log_loss": {
           "mean": 0.4898,
@@ -166,7 +166,7 @@
       },
       "Logistic (all features)": {
         "accuracy": {
-          "mean": 0.7058,
+          "mean": 0.7057,
           "std": 0.0352
         },
         "balanced_accuracy": {
@@ -174,7 +174,7 @@
           "std": 0.0106
         },
         "macro_f1": {
-          "mean": 0.3315,
+          "mean": 0.3316,
           "std": 0.0244
         },
         "log_loss": {
@@ -347,23 +347,23 @@
       "Logistic (all features)": {
         "accuracy": {
           "mean": 0.4837,
-          "std": 0.054
+          "std": 0.0539
         },
         "balanced_accuracy": {
-          "mean": 0.4739,
-          "std": 0.0423
+          "mean": 0.474,
+          "std": 0.0422
         },
         "macro_f1": {
           "mean": 0.4521,
-          "std": 0.0424
+          "std": 0.0423
         },
         "log_loss": {
           "mean": 1.0433,
-          "std": 0.0689
+          "std": 0.069
         },
         "ic": {
           "mean": 0.4136,
-          "std": 0.0613
+          "std": 0.0614
         }
       },
       "XGBoost": {
@@ -436,24 +436,24 @@
       },
       "Logistic (all features)": {
         "accuracy": {
-          "mean": 0.5825,
-          "std": 0.0274
+          "mean": 0.5826,
+          "std": 0.0273
         },
         "balanced_accuracy": {
-          "mean": 0.4231,
+          "mean": 0.4232,
           "std": 0.0158
         },
         "macro_f1": {
-          "mean": 0.4154,
-          "std": 0.0187
+          "mean": 0.4156,
+          "std": 0.0188
         },
         "log_loss": {
-          "mean": 0.8764,
+          "mean": 0.8763,
           "std": 0.0364
         },
         "ic": {
-          "mean": 0.2511,
-          "std": 0.0398
+          "mean": 0.2512,
+          "std": 0.0397
         }
       },
       "XGBoost": {
@@ -565,9 +565,9 @@
           "ic": 0.4079
         },
         {
-          "accuracy": 0.7762,
-          "balanced_accuracy": 0.3391,
-          "macro_f1": 0.3035,
+          "accuracy": 0.7761,
+          "balanced_accuracy": 0.3389,
+          "macro_f1": 0.3032,
           "log_loss": 0.5793,
           "ic": 0.4709
         },
@@ -708,11 +708,11 @@
       ],
       "Logistic (all features)": [
         {
-          "accuracy": 0.7054,
+          "accuracy": 0.7053,
           "balanced_accuracy": 0.3488,
-          "macro_f1": 0.3129,
-          "log_loss": 0.7415,
-          "ic": 0.4426
+          "macro_f1": 0.313,
+          "log_loss": 0.7416,
+          "ic": 0.4425
         },
         {
           "accuracy": 0.6379,
@@ -1008,15 +1008,15 @@
       ],
       "Logistic (all features)": [
         {
-          "accuracy": 0.3948,
-          "balanced_accuracy": 0.4249,
-          "macro_f1": 0.3877,
-          "log_loss": 1.1363,
-          "ic": 0.3415
+          "accuracy": 0.395,
+          "balanced_accuracy": 0.4251,
+          "macro_f1": 0.3879,
+          "log_loss": 1.1365,
+          "ic": 0.3412
         },
         {
           "accuracy": 0.4476,
-          "balanced_accuracy": 0.4215,
+          "balanced_accuracy": 0.4214,
           "macro_f1": 0.4154,
           "log_loss": 1.117,
           "ic": 0.3401
@@ -1158,31 +1158,31 @@
       ],
       "Logistic (all features)": [
         {
-          "accuracy": 0.5531,
-          "balanced_accuracy": 0.4379,
-          "macro_f1": 0.4452,
-          "log_loss": 0.9326,
-          "ic": 0.2207
+          "accuracy": 0.5532,
+          "balanced_accuracy": 0.4383,
+          "macro_f1": 0.4457,
+          "log_loss": 0.9325,
+          "ic": 0.2212
         },
         {
-          "accuracy": 0.5565,
-          "balanced_accuracy": 0.3944,
-          "macro_f1": 0.3928,
-          "log_loss": 0.8812,
-          "ic": 0.2002
+          "accuracy": 0.5568,
+          "balanced_accuracy": 0.3946,
+          "macro_f1": 0.393,
+          "log_loss": 0.8811,
+          "ic": 0.2003
         },
         {
-          "accuracy": 0.6287,
-          "balanced_accuracy": 0.4372,
+          "accuracy": 0.6288,
+          "balanced_accuracy": 0.4373,
           "macro_f1": 0.4278,
-          "log_loss": 0.8219,
+          "log_loss": 0.822,
           "ic": 0.3161
         },
         {
           "accuracy": 0.591,
           "balanced_accuracy": 0.4219,
           "macro_f1": 0.4065,
-          "log_loss": 0.8577,
+          "log_loss": 0.8578,
           "ic": 0.2544
         },
         {

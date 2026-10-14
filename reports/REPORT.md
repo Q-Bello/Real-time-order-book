@@ -1,6 +1,6 @@
 # Results
 
-_Generated 2026-10-14 03:48 UTC by `python -m lobpred.report`._
+_Generated 2026-10-14 04:12 UTC by `python -m lobpred.report`._
 
 ## Data
 
@@ -12,8 +12,8 @@ _Generated 2026-10-14 03:48 UTC by `python -m lobpred.report`._
 | Book updates per second | 9.97 |
 | Price-level changes per second | 257.3 |
 | Trades | 100,197 |
-| Book update latency (p50 / p99) | 26.5 / 421.4 µs |
-| Feature computation latency (p50 / p99) | 81.4 / 132.7 µs |
+| Book update latency (p50 / p99) | 16.2 / 293.8 µs |
+| Feature computation latency (p50 / p99) | 44.8 / 77.0 µs |
 
 ## Predictive performance
 
@@ -23,7 +23,7 @@ _Generated 2026-10-14 03:48 UTC by `python -m lobpred.report`._
 |---|---|---|---|---|---|---|
 | 1s | Majority class | 0.822 ± 0.024 | 0.333 ± 0.000 | 0.301 ± 0.005 | 0.607 ± 0.064 | 0.000 ± 0.000 |
 | 1s | OFI only (logistic) | 0.819 ± 0.024 | 0.351 ± 0.007 | 0.338 ± 0.016 | 0.562 ± 0.056 | 0.291 ± 0.034 |
-| 1s | Logistic (all features) | 0.821 ± 0.023 | 0.342 ± 0.005 | 0.320 ± 0.011 | 0.490 ± 0.050 | 0.433 ± 0.021 |
+| 1s | Logistic (all features) | 0.821 ± 0.023 | 0.342 ± 0.005 | 0.320 ± 0.012 | 0.490 ± 0.050 | 0.433 ± 0.021 |
 | 1s | XGBoost | 0.825 ± 0.025 | 0.410 ± 0.014 | 0.436 ± 0.020 | 0.492 ± 0.057 | 0.429 ± 0.027 |
 | 2s | Majority class | 0.702 ± 0.036 | 0.333 ± 0.000 | 0.275 ± 0.009 | 0.838 ± 0.076 | 0.000 ± 0.000 |
 | 2s | OFI only (logistic) | 0.705 ± 0.036 | 0.360 ± 0.008 | 0.333 ± 0.020 | 0.784 ± 0.068 | 0.304 ± 0.034 |
@@ -39,7 +39,7 @@ _Generated 2026-10-14 03:48 UTC by `python -m lobpred.report`._
 | 10s | XGBoost | 0.485 ± 0.044 | 0.474 ± 0.041 | 0.466 ± 0.041 | 1.073 ± 0.102 | 0.378 ± 0.086 |
 | 30s | Majority class | 0.487 ± 0.035 | 0.333 ± 0.000 | 0.218 ± 0.011 | 0.911 ± 0.051 | 0.000 ± 0.000 |
 | 30s | OFI only (logistic) | 0.509 ± 0.025 | 0.353 ± 0.003 | 0.304 ± 0.014 | 0.903 ± 0.051 | 0.133 ± 0.020 |
-| 30s | Logistic (all features) | 0.583 ± 0.027 | 0.423 ± 0.016 | 0.415 ± 0.019 | 0.876 ± 0.036 | 0.251 ± 0.040 |
+| 30s | Logistic (all features) | 0.583 ± 0.027 | 0.423 ± 0.016 | 0.416 ± 0.019 | 0.876 ± 0.036 | 0.251 ± 0.040 |
 | 30s | XGBoost | 0.537 ± 0.025 | 0.394 ± 0.007 | 0.385 ± 0.007 | 0.918 ± 0.053 | 0.190 ± 0.045 |
 
 ![Predictability by horizon](predictability_by_horizon.png)

@@ -7,12 +7,12 @@
   "book_updates_per_second": 9.97,
   "level_changes_per_second": 257.3,
   "book_update_latency_us": {
-    "p50": 26.5,
-    "p99": 421.4
+    "p50": 16.2,
+    "p99": 293.8
   },
   "feature_latency_us": {
-    "p50": 81.4,
-    "p99": 132.7
+    "p50": 44.8,
+    "p99": 77.0
   },
   "class_balance": {
     "1s": {
