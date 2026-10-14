@@ -17,7 +17,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import pandas as pd  # noqa: E402
 
-from lobpred.backtest import FEES_BPS, run_backtest  # noqa: E402
+from lobpred.backtest import run_backtest  # noqa: E402
 from lobpred.config import OOF_DIR, PRIMARY_HORIZON_S, PRIMARY_THRESHOLD, REPORT_DIR  # noqa: E402
 
 # Validated categorical palette (first three slots pass all-pairs CVD checks) and chart ink.
@@ -25,6 +25,7 @@ SURFACE, INK, INK_2, MUTED, GRID, AXIS = "#fcfcfb", "#0b0b0b", "#52514e", "#8987
 SERIES = ["#2a78d6", "#eb6834", "#1baf7a"]
 MODEL_SERIES = ["XGBoost", "Logistic (all features)", "OFI only (logistic)"]
 BASELINE = "Majority class"
+CHART_FEES_BPS = (0.1, 1.0)
 
 plt.rcParams.update({
     "font.family": "sans-serif",
@@ -124,12 +125,13 @@ def chart_backtest(oof: pd.DataFrame, horizon_s: float, threshold: float, out: P
     if trades.empty:
         return
     hours = (trades["exit_ts"] - oof["ts"].iloc[0]) / 3.6e6
-    series = [
-        ("Gross (mid to mid)", trades["gross_bps"]),
-        ("After crossing the spread", trades["after_spread_bps"]),
-        (f"After spread and {FEES_BPS[1]:g} bp fee per side", trades["after_spread_bps"] - 2 * FEES_BPS[1]),
+    # Gross and after-spread returns are near identical on BTC/USDT, whose spread is usually one cent,
+    # so the chart shows the effect of fees instead.
+    series = [("After crossing the spread", trades["after_spread_bps"])] + [
+        (f"Plus a {fee:g} bp fee per side", trades["after_spread_bps"] - 2 * fee) for fee in CHART_FEES_BPS
     ]
-    fig, ax = plt.subplots(figsize=(9, 4.8))
+    spread_bps = float(((oof["ask"] - oof["bid"]) / oof["mid"]).mean() * 1e4)
+    fig, ax = plt.subplots(figsize=(9, 5.0))
     ax.axhline(0, color=AXIS, linewidth=1)
     ends = []
     for (name, pnl), color in zip(series, SERIES, strict=True):
@@ -142,7 +144,9 @@ def chart_backtest(oof: pd.DataFrame, horizon_s: float, threshold: float, out: P
     ax.set_title(f"Backtest of out-of-sample signals: {horizon_s:g}s horizon, threshold {threshold:g}, "
                  f"{len(trades):,} trades")
     _legend_below(fig, ax, 3)
-    fig.tight_layout(rect=(0, 0.07, 0.76, 1))
+    fig.text(0.01, 0.075, f"Average quoted spread: {spread_bps:.4f} bps. Fees are illustrative.",
+             color=MUTED, fontsize=8)
+    fig.tight_layout(rect=(0, 0.1, 0.76, 1))
     _end_labels(ax, ends)
     fig.savefig(out, dpi=160)
     plt.close(fig)
