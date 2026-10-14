@@ -1,0 +1,44 @@
+{
+  "rows": 143492,
+  "hours_of_data": 4.0,
+  "segments": 1,
+  "book_updates": 143542,
+  "trades": 100197,
+  "book_updates_per_second": 9.97,
+  "level_changes_per_second": 257.3,
+  "book_update_latency_us": {
+    "p50": 16.2,
+    "p99": 293.8
+  },
+  "feature_latency_us": {
+    "p50": 44.8,
+    "p99": 77.0
+  },
+  "class_balance": {
+    "1s": {
+      "STABLE": 0.837,
+      "DOWN": 0.081,
+      "UP": 0.082
+    },
+    "2s": {
+      "STABLE": 0.727,
+      "DOWN": 0.136,
+      "UP": 0.137
+    },
+    "5s": {
+      "STABLE": 0.503,
+      "DOWN": 0.245,
+      "UP": 0.252
+    },
+    "10s": {
+      "STABLE": 0.305,
+      "DOWN": 0.341,
+      "UP": 0.354
+    },
+    "30s": {
+      "STABLE": 0.084,
+      "DOWN": 0.436,
+      "UP": 0.48
+    }
+  }
+}
