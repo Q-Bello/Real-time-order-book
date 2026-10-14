@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   collect:
@@ -27,9 +28,14 @@ jobs:
           cache: pip
       - run: pip install -e .
 
-      - name: Record 4 hours of live data
-        continue-on-error: true
-        run: python -m lobpred.record --minutes 240
+      # Re-uses the 4-hour recording from the first run instead of recording again.
+      - name: Download saved recording
+        uses: actions/download-artifact@v4
+        with:
+          name: raw-recording
+          path: data/raw/
+          run-id: 38486075600
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build dataset, evaluate, report
         run: |
@@ -58,13 +64,6 @@ jobs:
           git config user.name "Quddus Bello"
           git config user.email "quddusbello@gmail.com"
           git add reports
-          git commit -m "Add results from live BTC/USDT recording"
+          git commit -m "Regenerate report with updated backtest chart" || echo "No changes"
           git push origin HEAD:feat/research-pipeline
 
-      - name: Keep the raw recording for 14 days
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: raw-recording
-          path: data/raw/
-          retention-days: 14
